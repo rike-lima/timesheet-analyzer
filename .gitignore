@@ -1,0 +1,46 @@
+# Node modules
+node_modules/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by testing tools
+coverage/
+
+# Dependency directories
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# dotenv environment files
+.env
+.env.*.local
+
+# System files
+.DS_Store
+Thumbs.db
+
+# VSCode settings (opcional)
+.vscode/
+
+# Build directories (ajuste conforme seu Electron ou bundler)
+dist/
+build/
+out/
+
+# Electron specific
+*.asar
