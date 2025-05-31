@@ -3,7 +3,6 @@ const fs = require("fs");
 const xlsx = require("xlsx");
 const PDFDocument = require("pdfkit");
 const { eachDayOfInterval, isSaturday, isSunday } = require("date-fns");
-const { contextBridge } = require("electron");
 const configPath = path.join(__dirname, "config.json");
 const { dialog } = require("electron");
 const { contextBridge, ipcRenderer } = require("electron");
@@ -77,90 +76,96 @@ contextBridge.exposeInMainWorld("api", {
     }
   },
 
-  gerarRelatorio: (mes, ano, feriados) => {
-    return new Promise((resolve) => {
-      const jsonPath = path.join(__dirname, "cargas-horarias.json");
-      let cargasHorarias = {};
-      try {
-        cargasHorarias = JSON.parse(fs.readFileSync(jsonPath, "utf-8"));
-      } catch (e) {}
+ gerarRelatorio: (mes, ano, feriados, ajustes = {}) => {
+  return new Promise((resolve) => {
+    const jsonPath = path.join(__dirname, "cargas-horarias.json");
+    let cargasHorarias = {};
+    try {
+      cargasHorarias = JSON.parse(fs.readFileSync(jsonPath, "utf-8"));
+    } catch (e) {}
 
-      const inicio = new Date(ano, mes - 1, 1);
-      const fim = new Date(ano, mes, 0);
-      const diasUteis =
-        eachDayOfInterval({ start: inicio, end: fim }).filter(
-          (d) => !isSaturday(d) && !isSunday(d)
-        ).length - feriados;
+    const inicio = new Date(ano, mes - 1, 1);
+    const fim = new Date(ano, mes, 0);
+    const totalDiasUteis = eachDayOfInterval({ start: inicio, end: fim }).filter(
+      (d) => !isSaturday(d) && !isSunday(d)
+    ).length;
 
-      const workbook = xlsx.readFile(planilhaDestino);
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const allCells = Object.entries(sheet);
-      const entries = [];
-      let nomeAtual = null;
+    const diasUteis = totalDiasUteis - feriados;
 
-      function horasParaMinutos(horasStr) {
-        const [h, m] = horasStr.split(":").map(Number);
-        return h * 60 + m;
+    const workbook = xlsx.readFile(planilhaDestino);
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const allCells = Object.entries(sheet);
+    const entries = [];
+    let nomeAtual = null;
+
+    function horasParaMinutos(horasStr) {
+      const [h, m] = horasStr.split(":").map(Number);
+      return h * 60 + m;
+    }
+
+    function minutosParaHoras(min) {
+      const h = Math.floor(min / 60);
+      const m = String(min % 60).padStart(2, "0");
+      return `${h}:${m}`;
+    }
+
+    for (let i = 0; i < allCells.length; i++) {
+      const [cell, value] = allCells[i];
+
+      if (
+        value &&
+        typeof value.v === "string" &&
+        value.v.toLowerCase().includes("empregado")
+      ) {
+        const col = cell.replace(/[0-9]/g, "");
+        const row = parseInt(cell.replace(/[A-Z]/g, ""));
+        const nextCol = String.fromCharCode(col.charCodeAt(0) + 1);
+        const nomeCell = `${nextCol}${row}`;
+        nomeAtual = sheet[nomeCell] ? sheet[nomeCell].v : "Desconhecido";
       }
 
-      function minutosParaHoras(min) {
-        const h = Math.floor(min / 60);
-        const m = String(min % 60).padStart(2, "0");
-        return `${h}:${m}`;
-      }
+      if (
+        value &&
+        typeof value.v === "string" &&
+        value.v.toLowerCase().includes("total de horas")
+      ) {
+        const col = cell.replace(/[0-9]/g, "");
+        const row = parseInt(cell.replace(/[A-Z]/g, ""));
+        const nextCol = String.fromCharCode(col.charCodeAt(0) + 1);
+        const horasCell = `${nextCol}${row}`;
+        const totalHoras = sheet[horasCell] ? sheet[horasCell].v : "00:00";
 
-      for (let i = 0; i < allCells.length; i++) {
-        const [cell, value] = allCells[i];
-
-        if (
-          value &&
-          typeof value.v === "string" &&
-          value.v.toLowerCase().includes("empregado")
-        ) {
-          const col = cell.replace(/[0-9]/g, "");
-          const row = parseInt(cell.replace(/[A-Z]/g, ""));
-          const nextCol = String.fromCharCode(col.charCodeAt(0) + 1);
-          const nomeCell = `${nextCol}${row}`;
-          nomeAtual = sheet[nomeCell] ? sheet[nomeCell].v : "Desconhecido";
+        if (nomeAtual) {
+          entries.push({ nome: nomeAtual, total: totalHoras });
+          nomeAtual = null;
         }
-
-        if (
-          value &&
-          typeof value.v === "string" &&
-          value.v.toLowerCase().includes("total de horas")
-        ) {
-          const col = cell.replace(/[0-9]/g, "");
-          const row = parseInt(cell.replace(/[A-Z]/g, ""));
-          const nextCol = String.fromCharCode(col.charCodeAt(0) + 1);
-          const horasCell = `${nextCol}${row}`;
-          const totalHoras = sheet[horasCell] ? sheet[horasCell].v : "00:00";
-
-          if (nomeAtual) {
-            entries.push({ nome: nomeAtual, total: totalHoras });
-            nomeAtual = null;
-          }
-        }
       }
+    }
 
-      const resultado = entries.map((emp) => {
-        const carga = cargasHorarias[emp.nome] || 8.45;
-        const idealMin = diasUteis * carga * 60;
-        const realMin = horasParaMinutos(emp.total);
-        const diff = realMin - idealMin;
+    const resultado = entries.map((emp) => {
+      const ajustesFuncionario = ajustes[emp.nome] || {};
+      const carga = ajustesFuncionario.carga ?? cargasHorarias[emp.nome] ?? 8.45;
+      const faltas = ajustesFuncionario.faltas ?? 0;
 
-        return {
-          nome: emp.nome,
-          carga: carga,
-          trabalhadas: emp.total,
-          ideais: minutosParaHoras(idealMin),
-          diferenca: (diff > 0 ? "+" : "-") + minutosParaHoras(Math.abs(diff)),
-          status: diff === 0 ? "✅" : diff > 0 ? "🟢" : "🔴",
-        };
-      });
+      const diasParaCalculo = Math.max(diasUteis - faltas, 0);
+      const idealMin = diasParaCalculo * carga * 60;
+      const realMin = horasParaMinutos(emp.total);
+      const diff = realMin - idealMin;
 
-      resolve(resultado);
+      return {
+        nome: emp.nome,
+        carga,
+        trabalhadas: emp.total,
+        ideais: minutosParaHoras(idealMin),
+        diferenca: (diff > 0 ? "+" : "-") + minutosParaHoras(Math.abs(diff)),
+        status: diff === 0 ? "✅" : diff > 0 ? "🟢" : "🔴",
+      };
     });
-  },
+
+    resolve(resultado);
+  });
+},
+
 
  salvarArquivo: async (defaultName, conteudo) => {
   try {

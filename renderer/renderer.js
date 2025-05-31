@@ -17,7 +17,25 @@ async function gerar() {
   const ano = parseInt(document.getElementById("ano").value);
   const feriados = parseInt(document.getElementById("feriados").value);
 
-  const resultado = await window.api.gerarRelatorio(mes, ano, feriados);
+  const cargasInputs = document.querySelectorAll(".input-carga");
+  const faltasInputs = document.querySelectorAll(".input-falta");
+  const ajustes = {};
+
+  cargasInputs.forEach((inputCarga, index) => {
+    const nome = inputCarga.dataset.nome;
+    const carga = parseFloat(inputCarga.value);
+    const faltas = parseInt(faltasInputs[index].value) || 0;
+    if (nome && !isNaN(carga)) {
+      ajustes[nome] = { carga, faltas };
+    }
+  });
+
+  const resultado = await window.api.gerarRelatorio(
+    mes,
+    ano,
+    feriados,
+    ajustes
+  );
 
   const div = document.getElementById("resultado");
   if (!resultado || resultado.length === 0) {
@@ -69,16 +87,30 @@ async function abrirEditorCargas() {
     const tdNome = document.createElement("td");
     tdNome.textContent = nome;
 
+    // Campo de carga horária
     const tdCarga = document.createElement("td");
-    const input = document.createElement("input");
-    input.type = "number";
-    input.step = "0.25";
-    input.value = cargas[nome] || "";
-    input.dataset.nome = nome;
+    const inputCarga = document.createElement("input");
+    inputCarga.type = "number";
+    inputCarga.step = "0.25";
+    inputCarga.value = cargas[nome] || "";
+    inputCarga.dataset.nome = nome;
+    inputCarga.classList.add("input-carga");
+    tdCarga.appendChild(inputCarga);
 
-    tdCarga.appendChild(input);
+    // Campo de faltas justificadas
+    const tdFaltas = document.createElement("td");
+    const inputFaltas = document.createElement("input");
+    inputFaltas.type = "number";
+    inputFaltas.min = "0";
+    inputFaltas.step = "1";
+    inputFaltas.value = 0;
+    inputFaltas.dataset.nome = nome;
+    inputFaltas.classList.add("input-falta");
+    tdFaltas.appendChild(inputFaltas);
+
     tr.appendChild(tdNome);
     tr.appendChild(tdCarga);
+    tr.appendChild(tdFaltas);
     tabela.appendChild(tr);
   });
 
