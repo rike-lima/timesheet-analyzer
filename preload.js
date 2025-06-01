@@ -51,8 +51,8 @@ contextBridge.exposeInMainWorld("api", {
         const nomeCell = `${nextCol}${row}`;
         nomeAtual = sheet[nomeCell] ? sheet[nomeCell].v : null;
 
-        // 👇 Aqui é onde você faz a verificação e adiciona apenas se não for isento
-        if (nomeAtual && !isentos.has(nomeAtual)) {
+        //verificar se é isento
+         if (nomeAtual && !isentos.has(nomeAtual)) {
           nomes.add(nomeAtual);
         }
       }
@@ -94,7 +94,7 @@ contextBridge.exposeInMainWorld("api", {
         cargasHorarias = JSON.parse(fs.readFileSync(jsonPath, "utf-8"));
       } catch (e) {}
 
-      // 🔽 Adiciona aqui a leitura dos isentos
+      
       let isentos = new Set();
       try {
         const isentosPath = path.join(__dirname, "isentos.json");
@@ -156,7 +156,7 @@ contextBridge.exposeInMainWorld("api", {
           const horasCell = `${nextCol}${row}`;
           const totalHoras = sheet[horasCell] ? sheet[horasCell].v : "00:00";
 
-          // 🔽 Pula os isentos
+        
           if (nomeAtual && !isentos.has(nomeAtual)) {
             entries.push({ nome: nomeAtual, total: totalHoras });
           }
@@ -207,6 +207,7 @@ contextBridge.exposeInMainWorld("api", {
       return false;
     }
   },
+  
   gerarPDF: async (dados, mes, ano) => {
     try {
       const filePath = await window.api.escolherLocalSalvar(

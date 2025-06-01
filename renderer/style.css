@@ -54,3 +54,11 @@ th {
   background-color: #007B8F;
   color: white;
 }
+
+#arquivo{
+    width: 450px;
+}
+
+.inputMes{
+    width: 50px;
+}

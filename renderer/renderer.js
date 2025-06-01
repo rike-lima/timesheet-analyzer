@@ -68,6 +68,7 @@ async function gerar() {
   div.innerHTML = html;
 
   document.getElementById("acoesExportacao").style.display = "block";
+  document.getElementById("btnEditarCargas").disabled = false;
 
   await window.api.salvarConfiguracoes({ mes, ano, feriados });
 }
@@ -137,10 +138,7 @@ async function salvarCargas() {
   } else {
     alert("Erro ao salvar.");
   }
-
-  
-} 
-
+}
 
 async function exportarCSV() {
   const mes = parseInt(document.getElementById("mes").value);
@@ -188,7 +186,6 @@ async function exportarCSV() {
     alert("Exportação cancelada ou falhou.");
   }
 }
-
 
 async function exportarPDF() {
   const mes = parseInt(document.getElementById("mes").value);
@@ -238,22 +235,23 @@ function calcularDiasUteisDoMes(mes, ano) {
   return diasUteis;
 }
 
-
 window.onload = async () => {
-
   function atualizarInfoDiasUteis() {
-  const mes = parseInt(document.getElementById("mes").value);
-  const ano = parseInt(document.getElementById("ano").value);
+    const mes = parseInt(document.getElementById("mes").value);
+    const ano = parseInt(document.getElementById("ano").value);
 
-  if (!isNaN(mes) && !isNaN(ano)) {
-    const dias = calcularDiasUteisDoMes(mes, ano);
-    document.getElementById("diasUteisTotal").textContent = dias;
+    if (!isNaN(mes) && !isNaN(ano)) {
+      const dias = calcularDiasUteisDoMes(mes, ano);
+      document.getElementById("diasUteisTotal").textContent = dias;
+    }
   }
-}
 
-document.getElementById("mes").addEventListener("change", atualizarInfoDiasUteis);
-document.getElementById("ano").addEventListener("change", atualizarInfoDiasUteis);
-
+  document
+    .getElementById("mes")
+    .addEventListener("change", atualizarInfoDiasUteis);
+  document
+    .getElementById("ano")
+    .addEventListener("change", atualizarInfoDiasUteis);
 
   const config = await window.api.lerConfiguracoes();
   if (config) {
@@ -262,10 +260,8 @@ document.getElementById("ano").addEventListener("change", atualizarInfoDiasUteis
     document.getElementById("feriados").value = config.feriados || "";
   }
 
-   atualizarInfoDiasUteis();
+  atualizarInfoDiasUteis();
 
-  // Inicialmente: desativa ações até o upload da planilha
   document.getElementById("btnEditarCargas").disabled = true;
   document.getElementById("acoesExportacao").style.display = "none";
-  
 };
