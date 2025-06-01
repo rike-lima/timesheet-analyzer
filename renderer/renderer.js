@@ -118,12 +118,11 @@ async function abrirEditorCargas() {
 }
 
 async function salvarCargas() {
-  const inputs = document.querySelectorAll("#tabelaCargas tbody input");
+  const cargasInputs = document.querySelectorAll("#tabelaCargas .input-carga");
   const novasCargas = {};
 
-  inputs.forEach((input) => {
-    const nome =
-      input.dataset.nome || document.getElementById("novoNome").value;
+  cargasInputs.forEach((input) => {
+    const nome = input.dataset.nome;
     const carga = parseFloat(input.value);
     if (nome && !isNaN(carga)) {
       novasCargas[nome] = carga;
@@ -133,25 +132,46 @@ async function salvarCargas() {
   const sucesso = await window.api.salvarCargasHorarias(novasCargas);
   if (sucesso) {
     alert("Cargas salvas com sucesso!");
+    document.getElementById("editorCargas").style.display = "none";
+    await gerar();
   } else {
     alert("Erro ao salvar.");
   }
 
-  document.getElementById("editorCargas").style.display = "none";
-}
+  
+} 
+
 
 async function exportarCSV() {
   const mes = parseInt(document.getElementById("mes").value);
   const ano = parseInt(document.getElementById("ano").value);
   const feriados = parseInt(document.getElementById("feriados").value);
-  const dados = await window.api.gerarRelatorio(mes, ano, feriados);
 
-  const linhas = ["Nome,Carga Diária,Trabalhadas,Ideais,Diferença,Status"];
+  const cargasInputs = document.querySelectorAll(".input-carga");
+  const faltasInputs = document.querySelectorAll(".input-falta");
+  const ajustes = {};
+
+  cargasInputs.forEach((inputCarga, index) => {
+    const nome = inputCarga.dataset.nome;
+    const carga = parseFloat(inputCarga.value);
+    const faltas = parseInt(faltasInputs[index].value) || 0;
+    if (nome && !isNaN(carga)) {
+      ajustes[nome] = { carga, faltas };
+    }
+  });
+
+  const dados = await window.api.gerarRelatorio(mes, ano, feriados, ajustes);
+
+  const linhas = [
+    "Nome,Carga Diária,Faltas Justificadas,Trabalhadas,Ideais,Diferença,Status",
+  ];
   dados.forEach((emp) => {
+    const faltas = ajustes[emp.nome]?.faltas ?? 0;
     linhas.push(
       [
         emp.nome,
         emp.carga,
+        faltas,
         emp.trabalhadas,
         emp.ideais,
         emp.diferenca,
@@ -161,9 +181,6 @@ async function exportarCSV() {
   });
 
   const conteudo = linhas.join("\n");
-  await window.api.salvarArquivo("relatorio.csv", conteudo);
-  alert("Relatório CSV exportado com sucesso.");
-
   const sucesso = await window.api.salvarArquivo("relatorio.csv", conteudo);
   if (sucesso) {
     alert("Relatório CSV exportado com sucesso.");
@@ -172,16 +189,35 @@ async function exportarCSV() {
   }
 }
 
+
 async function exportarPDF() {
   const mes = parseInt(document.getElementById("mes").value);
   const ano = parseInt(document.getElementById("ano").value);
   const feriados = parseInt(document.getElementById("feriados").value);
-  const dados = await window.api.gerarRelatorio(mes, ano, feriados);
 
-  await window.api.gerarPDF(dados, mes, ano);
-  alert("Relatório PDF exportado com sucesso.");
+  const cargasInputs = document.querySelectorAll(".input-carga");
+  const faltasInputs = document.querySelectorAll(".input-falta");
+  const ajustes = {};
 
-  const sucesso = await window.api.gerarPDF(dados, mes, ano);
+  cargasInputs.forEach((inputCarga, index) => {
+    const nome = inputCarga.dataset.nome;
+    const carga = parseFloat(inputCarga.value);
+    const faltas = parseInt(faltasInputs[index].value) || 0;
+    if (nome && !isNaN(carga)) {
+      ajustes[nome] = { carga, faltas };
+    }
+  });
+
+  const dados = await window.api.gerarRelatorio(mes, ano, feriados, ajustes);
+  const sucesso = await window.api.gerarPDF(
+    dados.map((emp) => ({
+      ...emp,
+      faltas: ajustes[emp.nome]?.faltas ?? 0,
+    })),
+    mes,
+    ano
+  );
+
   if (sucesso) {
     alert("Relatório PDF exportado com sucesso.");
   } else {
@@ -189,7 +225,36 @@ async function exportarPDF() {
   }
 }
 
+function calcularDiasUteisDoMes(mes, ano) {
+  const inicio = new Date(ano, mes - 1, 1);
+  const fim = new Date(ano, mes, 0);
+
+  const diasUteis = Array.from({ length: fim.getDate() }, (_, i) => {
+    const data = new Date(ano, mes - 1, i + 1);
+    const dia = data.getDay();
+    return dia !== 0 && dia !== 6; // 0 = domingo, 6 = sábado
+  }).filter(Boolean).length;
+
+  return diasUteis;
+}
+
+
 window.onload = async () => {
+
+  function atualizarInfoDiasUteis() {
+  const mes = parseInt(document.getElementById("mes").value);
+  const ano = parseInt(document.getElementById("ano").value);
+
+  if (!isNaN(mes) && !isNaN(ano)) {
+    const dias = calcularDiasUteisDoMes(mes, ano);
+    document.getElementById("diasUteisTotal").textContent = dias;
+  }
+}
+
+document.getElementById("mes").addEventListener("change", atualizarInfoDiasUteis);
+document.getElementById("ano").addEventListener("change", atualizarInfoDiasUteis);
+
+
   const config = await window.api.lerConfiguracoes();
   if (config) {
     document.getElementById("mes").value = config.mes || "";
@@ -197,7 +262,10 @@ window.onload = async () => {
     document.getElementById("feriados").value = config.feriados || "";
   }
 
+   atualizarInfoDiasUteis();
+
   // Inicialmente: desativa ações até o upload da planilha
   document.getElementById("btnEditarCargas").disabled = true;
   document.getElementById("acoesExportacao").style.display = "none";
+  
 };

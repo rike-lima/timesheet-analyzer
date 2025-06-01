@@ -3,40 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <title>Calculadora de Horas Trabalhadas</title>
-    <style>
-      body {
-        font-family: sans-serif;
-        padding: 2rem;
-      }
-      input,
-      button {
-        padding: 0.5rem;
-        margin: 0.5rem 0;
-      }
-      table {
-        border-collapse: collapse;
-        margin-top: 1rem;
-        width: 100%;
-      }
-      th,
-      td {
-        padding: 0.5rem;
-        border: 1px solid #ccc;
-        text-align: left;
-      }
-      th {
-        background: #f0f0f0;
-      }
-    </style>
+    <link rel="stylesheet" href="style.css">
   </head>
   <body>
     <h1>Relatório de Horas Trabalhadas</h1>
 
-    <label>Mês:</label>
-    <input type="number" id="mes" min="1" max="12" value="4" /><br />
+    <div style="display: flex; gap: 1rem; align-items: center;">
+  <div>
+    <label for="mes">Mês:</label>
+    <input type="number" id="mes" min="1" max="12" />
+  </div>
+  <div>
+    <label for="ano">Ano:</label>
+    <input type="number" id="ano" />
+  </div>
+</div>
 
-    <label>Ano:</label>
-    <input type="number" id="ano" min="2024" max="2100" value="2025" /><br />
+
+    <div id="infoDiasUteis" style="margin: 0.5rem 0; font-weight: bold">
+      Dias úteis no mês: <span id="diasUteisTotal">--</span>
+    </div>
 
     <label>Feriados (dias úteis):</label>
     <input type="number" id="feriados" min="0" value="2" /><br />
@@ -79,4 +65,8 @@
 
     <script src="renderer.js"></script>
   </body>
+  <footer style="text-align:center; margin-top: 2rem; font-size: 0.9rem; color: #666;">
+  Desenvolvido por <strong>Rodolfo Ikeda Lima</strong> © 2025
+</footer>
+
 </html>
