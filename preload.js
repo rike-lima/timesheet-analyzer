@@ -3,68 +3,61 @@ const fs = require("fs");
 const xlsx = require("xlsx");
 const PDFDocument = require("pdfkit");
 const { eachDayOfInterval, isSaturday, isSunday } = require("date-fns");
-const configPath = path.join(__dirname, "config.json");
-const { dialog } = require("electron");
 const { contextBridge, ipcRenderer } = require("electron");
 
-const planilhaDestino = path.join(
-  __dirname,
-  "Relatorio_pessoas_horas_trabalhadas.xls"
-);
+const configPath = path.join(__dirname, "config.json");
 
-function copiarPlanilha(origem) {
-  try {
-    fs.copyFileSync(origem, planilhaDestino);
-    return true;
-  } catch (e) {
-    console.error("Erro ao copiar a planilha:", e);
-    return false;
-  }
-}
+let caminhoPlanilhaAtual = null;
 
 contextBridge.exposeInMainWorld("api", {
-  carregarPlanilha: (caminho) => copiarPlanilha(caminho),
+  carregarPlanilha: (caminho) => {
+    if (fs.existsSync(caminho)) {
+      caminhoPlanilhaAtual = caminho;
+      return true;
+    } else {
+      console.error("Arquivo não encontrado:", caminho);
+      return false;
+    }
+  },
 
   listarFuncionarios: () => {
-  try {
-    const workbook = xlsx.readFile(planilhaDestino);
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const allCells = Object.entries(sheet);
-    const nomes = new Set();
+    try {
+      const workbook = xlsx.readFile(caminhoPlanilhaAtual);
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const allCells = Object.entries(sheet);
+      const nomes = new Set();
 
-    const isentosPath = path.join(__dirname, "isentos.json");
-    const isentosRaw = fs.readFileSync(isentosPath, "utf-8");
-    const isentos = new Set(JSON.parse(isentosRaw).isentos);
+      const isentosPath = path.join(__dirname, "isentos.json");
+      const isentosRaw = fs.readFileSync(isentosPath, "utf-8");
+      const isentos = new Set(JSON.parse(isentosRaw).isentos);
 
-    let nomeAtual = null;
+      let nomeAtual = null;
 
-    for (let i = 0; i < allCells.length; i++) {
-      const [cell, value] = allCells[i];
-      if (
-        value &&
-        typeof value.v === "string" &&
-        value.v.toLowerCase().includes("empregado")
-      ) {
-        const col = cell.replace(/[0-9]/g, "");
-        const row = parseInt(cell.replace(/[A-Z]/g, ""));
-        const nextCol = String.fromCharCode(col.charCodeAt(0) + 1);
-        const nomeCell = `${nextCol}${row}`;
-        nomeAtual = sheet[nomeCell] ? sheet[nomeCell].v : null;
+      for (let i = 0; i < allCells.length; i++) {
+        const [cell, value] = allCells[i];
+        if (
+          value &&
+          typeof value.v === "string" &&
+          value.v.toLowerCase().includes("empregado")
+        ) {
+          const col = cell.replace(/[0-9]/g, "");
+          const row = parseInt(cell.replace(/[A-Z]/g, ""));
+          const nextCol = String.fromCharCode(col.charCodeAt(0) + 1);
+          const nomeCell = `${nextCol}${row}`;
+          nomeAtual = sheet[nomeCell] ? sheet[nomeCell].v : null;
 
-        //verificar se é isento
-         if (nomeAtual && !isentos.has(nomeAtual)) {
-          nomes.add(nomeAtual);
+          if (nomeAtual && !isentos.has(nomeAtual)) {
+            nomes.add(nomeAtual);
+          }
         }
       }
+
+      return Array.from(nomes);
+    } catch (e) {
+      console.error("Erro ao listar funcionários:", e);
+      return [];
     }
-
-    return Array.from(nomes);
-  } catch (e) {
-    console.error("Erro ao listar funcionários:", e);
-    return [];
-  }
-},
-
+  },
 
   lerCargasHorarias: () => {
     const jsonPath = path.join(__dirname, "cargas-horarias.json");
@@ -94,7 +87,6 @@ contextBridge.exposeInMainWorld("api", {
         cargasHorarias = JSON.parse(fs.readFileSync(jsonPath, "utf-8"));
       } catch (e) {}
 
-      
       let isentos = new Set();
       try {
         const isentosPath = path.join(__dirname, "isentos.json");
@@ -113,7 +105,7 @@ contextBridge.exposeInMainWorld("api", {
 
       const diasUteis = totalDiasUteis - feriados;
 
-      const workbook = xlsx.readFile(planilhaDestino);
+      const workbook = xlsx.readFile(caminhoPlanilhaAtual);
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const allCells = Object.entries(sheet);
       const entries = [];
@@ -156,7 +148,6 @@ contextBridge.exposeInMainWorld("api", {
           const horasCell = `${nextCol}${row}`;
           const totalHoras = sheet[horasCell] ? sheet[horasCell].v : "00:00";
 
-        
           if (nomeAtual && !isentos.has(nomeAtual)) {
             entries.push({ nome: nomeAtual, total: totalHoras });
           }
@@ -207,7 +198,7 @@ contextBridge.exposeInMainWorld("api", {
       return false;
     }
   },
-  
+
   gerarPDF: async (dados, mes, ano) => {
     try {
       const filePath = await window.api.escolherLocalSalvar(
@@ -244,7 +235,6 @@ contextBridge.exposeInMainWorld("api", {
   },
 
   lerConfiguracoes: () => {
-    const configPath = path.join(__dirname, "config.json");
     try {
       if (!fs.existsSync(configPath)) {
         return { mes: "", ano: "", feriados: "" };
