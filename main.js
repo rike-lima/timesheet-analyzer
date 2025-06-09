@@ -1,8 +1,11 @@
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
-const { ipcMain, dialog } = require("electron");
+const remoteMain = require("@electron/remote/main");
 
 app.disableHardwareAcceleration();
+
+// Inicializa o remote antes de qualquer janela ser criada
+remoteMain.initialize();
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -16,18 +19,22 @@ function createWindow() {
       sandbox: false,
     },
   });
+
+  // Ativa o uso de @electron/remote para essa janela
+  remoteMain.enable(win.webContents);
+
   win.loadFile("renderer/index.html");
-
-  ipcMain.handle("salvar-dialogo", async (event, { padrao, extensao }) => {
-    const { canceled, filePath } = await dialog.showSaveDialog({
-      defaultPath: padrao,
-      filters: [{ name: extensao.toUpperCase(), extensions: [extensao] }],
-    });
-
-    if (canceled) return null;
-    return filePath;
-  });
 }
+
+// Diálogo customizado para salvar arquivo
+ipcMain.handle("salvar-dialogo", async (event, { padrao, extensao }) => {
+  const { canceled, filePath } = await dialog.showSaveDialog({
+    defaultPath: padrao,
+    filters: [{ name: extensao.toUpperCase(), extensions: [extensao] }],
+  });
+
+  return canceled ? null : filePath;
+});
 
 app.whenReady().then(createWindow);
 

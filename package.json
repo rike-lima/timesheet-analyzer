@@ -1,47 +1,47 @@
-  {
+{
     "name": "calculadora-horas",
     "version": "1.0.0",
     "description": "Aplicativo local para gerar relatórios de horas trabalhadas a partir de planilhas Excel.",
     "main": "main.js",
     "scripts": {
-      "start": "electron .",
-      "dist": "electron-builder"
+        "start": "electron .",
+        "dist": "electron-builder"
     },
     "author": "Rodolfo Ikeda Lima",
     "license": "MIT",
     "devDependencies": {
-      "electron": "^29.0.0",
-      "electron-builder": "^24.13.3"
+        "electron": "^29.0.0",
+        "electron-builder": "^24.13.3"
     },
     "dependencies": {
-      "date-fns": "^3.6.0",
-      "pdfkit": "^0.15.0",
-      "xlsx": "^0.18.5"
+        "@electron/remote": "^2.1.2",
+        "date-fns": "^3.6.0",
+        "pdfkit": "^0.15.0",
+        "xlsx": "^0.18.5"
     },
     "build": {
-      "appId": "com.rodolfo.calculadora",
-      "productName": "Calculadora de Horas Trabalhadas",
-      "files": [
-        "**/*"
-      ],
-      "extraResources": [
-        "isentos.json",
-        "cargas-horarias.json",
-        "config.json",
-        "Relatorio_pessoas_horas_trabalhadas.xls"
-      ],
-      "directories": {
-        "output": "dist"
-      },
-      "win": {
-        "target": "nsis",
-        "icon": "icon.ico",  
-        "sign": false
-      },
-      "nsis": {
-        "oneClick": false,
-        "perMachine": false,
-        "allowToChangeInstallationDirectory": true
-      }
+        "appId": "com.rodolfo.calculadora",
+        "productName": "CalculadoraHoras",
+        "files": [
+            "**/*"
+        ],
+        "extraResources": [
+            "isentos.json",
+            "cargas-horarias.json",
+            "config.json"
+        ],
+        "directories": {
+            "output": "dist"
+        },
+        "win": {
+            "target": "nsis",
+            "icon": "icon.ico",
+            "sign": false
+        },
+        "nsis": {
+            "oneClick": false,
+            "perMachine": false,
+            "allowToChangeInstallationDirectory": true
+        }
     }
-  }
+}

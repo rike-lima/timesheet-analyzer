@@ -4,10 +4,26 @@ const xlsx = require("xlsx");
 const PDFDocument = require("pdfkit");
 const { eachDayOfInterval, isSaturday, isSunday } = require("date-fns");
 const { contextBridge, ipcRenderer } = require("electron");
+const { app } = require("electron").remote || require("@electron/remote");
 
-const configPath = path.join(__dirname, "config.json");
+// Diretório seguro de escrita
+const dataDir = app.getPath("userData");
+const pathArquivo = (nome) => path.join(dataDir, nome);
+const configPath = pathArquivo("config.json");
 
 let caminhoPlanilhaAtual = null;
+
+// Garante que o arquivo existe copiando do __dirname se necessário
+function garantirArquivo(nome) {
+  const destino = pathArquivo(nome);
+  if (!fs.existsSync(destino)) {
+    const origem = path.join(__dirname, nome);
+    if (fs.existsSync(origem)) {
+      fs.copyFileSync(origem, destino);
+    }
+  }
+  return destino;
+}
 
 contextBridge.exposeInMainWorld("api", {
   carregarPlanilha: (caminho) => {
@@ -27,7 +43,7 @@ contextBridge.exposeInMainWorld("api", {
       const allCells = Object.entries(sheet);
       const nomes = new Set();
 
-      const isentosPath = path.join(__dirname, "isentos.json");
+      const isentosPath = garantirArquivo("isentos.json");
       const isentosRaw = fs.readFileSync(isentosPath, "utf-8");
       const isentos = new Set(JSON.parse(isentosRaw).isentos);
 
@@ -46,7 +62,12 @@ contextBridge.exposeInMainWorld("api", {
           const nomeCell = `${nextCol}${row}`;
           nomeAtual = sheet[nomeCell] ? sheet[nomeCell].v : null;
 
-          if (nomeAtual && !isentos.has(nomeAtual)) {
+          const nomeLimpo = nomeAtual?.trim().toLowerCase();
+          const isIsento = [...isentos].some(
+            (i) => i.trim().toLowerCase() === nomeLimpo
+          );
+
+          if (nomeAtual && !isIsento) {
             nomes.add(nomeAtual);
           }
         }
@@ -60,7 +81,7 @@ contextBridge.exposeInMainWorld("api", {
   },
 
   lerCargasHorarias: () => {
-    const jsonPath = path.join(__dirname, "cargas-horarias.json");
+    const jsonPath = garantirArquivo("cargas-horarias.json");
     try {
       return JSON.parse(fs.readFileSync(jsonPath, "utf-8"));
     } catch {
@@ -69,7 +90,7 @@ contextBridge.exposeInMainWorld("api", {
   },
 
   salvarCargasHorarias: (dados) => {
-    const jsonPath = path.join(__dirname, "cargas-horarias.json");
+    const jsonPath = pathArquivo("cargas-horarias.json");
     try {
       fs.writeFileSync(jsonPath, JSON.stringify(dados, null, 2));
       return true;
@@ -81,7 +102,8 @@ contextBridge.exposeInMainWorld("api", {
 
   gerarRelatorio: (mes, ano, feriados, ajustes = {}) => {
     return new Promise((resolve) => {
-      const jsonPath = path.join(__dirname, "cargas-horarias.json");
+      feriados = parseInt(feriados) || 0;
+      const jsonPath = garantirArquivo("cargas-horarias.json");
       let cargasHorarias = {};
       try {
         cargasHorarias = JSON.parse(fs.readFileSync(jsonPath, "utf-8"));
@@ -89,7 +111,7 @@ contextBridge.exposeInMainWorld("api", {
 
       let isentos = new Set();
       try {
-        const isentosPath = path.join(__dirname, "isentos.json");
+        const isentosPath = garantirArquivo("isentos.json");
         const isentosRaw = fs.readFileSync(isentosPath, "utf-8");
         isentos = new Set(JSON.parse(isentosRaw).isentos);
       } catch (e) {
@@ -112,8 +134,15 @@ contextBridge.exposeInMainWorld("api", {
       let nomeAtual = null;
 
       function horasParaMinutos(horasStr) {
+        if (
+          !horasStr ||
+          typeof horasStr !== "string" ||
+          !horasStr.includes(":")
+        ) {
+          return 0;
+        }
         const [h, m] = horasStr.split(":").map(Number);
-        return h * 60 + m;
+        return (h || 0) * 60 + (m || 0);
       }
 
       function minutosParaHoras(min) {
@@ -148,7 +177,12 @@ contextBridge.exposeInMainWorld("api", {
           const horasCell = `${nextCol}${row}`;
           const totalHoras = sheet[horasCell] ? sheet[horasCell].v : "00:00";
 
-          if (nomeAtual && !isentos.has(nomeAtual)) {
+          const nomeLimpo = nomeAtual?.trim().toLowerCase();
+          const isIsento = [...isentos].some(
+            (i) => i.trim().toLowerCase() === nomeLimpo
+          );
+
+          if (nomeAtual && !isIsento) {
             entries.push({ nome: nomeAtual, total: totalHoras });
           }
 
@@ -158,12 +192,15 @@ contextBridge.exposeInMainWorld("api", {
 
       const resultado = entries.map((emp) => {
         const ajustesFuncionario = ajustes[emp.nome] || {};
-        const carga =
+        let carga =
           ajustesFuncionario.carga ?? cargasHorarias[emp.nome] ?? 8.45;
-        const faltas = ajustesFuncionario.faltas ?? 0;
+        carga = parseFloat(carga);
+        if (!Number.isFinite(carga)) carga = 0;
 
+        const faltas = parseInt(ajustesFuncionario.faltas ?? 0) || 0;
         const diasParaCalculo = Math.max(diasUteis - faltas, 0);
         const idealMin = Math.round(diasParaCalculo * carga * 60);
+
         const realMin = horasParaMinutos(emp.total);
         const diff = realMin - idealMin;
 

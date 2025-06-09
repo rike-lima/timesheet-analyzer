@@ -15,7 +15,7 @@ async function gerar() {
 
   const mes = parseInt(document.getElementById("mes").value);
   const ano = parseInt(document.getElementById("ano").value);
-  const feriados = parseInt(document.getElementById("feriados").value);
+  const feriados = parseInt(document.getElementById("feriados").value) || 0;
 
   const cargasInputs = document.querySelectorAll(".input-carga");
   const faltasInputs = document.querySelectorAll(".input-falta");
